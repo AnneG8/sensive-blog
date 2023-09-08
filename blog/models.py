@@ -3,6 +3,12 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 
 
+class TagQuerySet(models.QuerySet):
+    def popular(self):
+        return self.annotate(posts_count=models.Count('posts')) \
+                   .order_by('-posts_count')
+
+
 class Post(models.Model):
     title = models.CharField('Заголовок', max_length=200)
     text = models.TextField('Текст')
@@ -42,6 +48,8 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.title
+
+    objects = TagQuerySet.as_manager()
 
     def clean(self):
         self.title = self.title.lower()
