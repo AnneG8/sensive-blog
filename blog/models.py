@@ -3,6 +3,32 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 
 
+class PostQuerySet(models.QuerySet):
+    def popular(self):
+        return self.annotate(likes_count=models.Count('likes')) \
+                   .order_by('-likes_count')
+
+    def fetch_with_comments_count(self):
+        """Добавить к постам поле с числом комментариев, оставленных к ним.
+        
+        Метод заменяет "annotate(comments_count=models.Count('comments'))".
+        Полезен в случае, когда к набору запроса ранее уже применялся
+        annotate(), помогает сохранить время ображения к БД.
+
+        """
+        posts_ids = [post.id for post in self]
+        posts = Post.objects.filter(id__in=posts_ids)
+        posts_with_comments = posts.annotate(
+            comments_count=models.Count('comments')
+        )
+        count_for_id = dict(
+            posts_with_comments.values_list('id', 'comments_count')
+        )
+        for post in self:
+            post.comments_count = count_for_id[post.id]
+        return self
+
+
 class TagQuerySet(models.QuerySet):
     def popular(self):
         return self.annotate(posts_count=models.Count('posts')) \
@@ -33,6 +59,8 @@ class Post(models.Model):
 
     def __str__(self):
         return self.title
+
+    objects = PostQuerySet.as_manager()
 
     def get_absolute_url(self):
         return reverse('post_detail', args={'slug': self.slug})
